@@ -1,0 +1,15 @@
+{
+  "users": {
+    "Nuone": {
+      "total": 0,
+      "transactions": []
+    },
+    "Kate": {
+      "total": 0,
+      "transactions": []
+    }
+  },
+  "grandTotal": 0,
+  "goal": 150000,
+  "transactions": []
+}
