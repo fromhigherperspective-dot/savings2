@@ -65,10 +65,12 @@ export default function BudgetApp() {
         const data = await response.json()
         setTransactions(data.transactions || [])
       } else {
-        console.error('Failed to load transactions')
+        console.error('Failed to load transactions - using empty array')
+        setTransactions([]) // Fallback to empty array
       }
     } catch (error) {
       console.error('Error loading transactions:', error)
+      setTransactions([]) // Fallback to empty array
     }
   }
 
@@ -79,10 +81,12 @@ export default function BudgetApp() {
         const data = await response.json()
         setSavingsGoal(data.settings?.savings_goal || 150000)
       } else {
-        console.error('Failed to load settings')
+        console.error('Failed to load settings - using default')
+        setSavingsGoal(150000) // Fallback to default
       }
     } catch (error) {
       console.error('Error loading settings:', error)
+      setSavingsGoal(150000) // Fallback to default
     }
   }
 
