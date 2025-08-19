@@ -23,6 +23,7 @@ import {
   DollarSign,
   PiggyBank,
   CreditCard,
+  RefreshCw,
 } from "lucide-react"
 
 interface Transaction {
@@ -46,6 +47,9 @@ export default function BudgetApp() {
   const [filterMonth, setFilterMonth] = useState<string>("all")
   const [filterUser, setFilterUser] = useState<"all" | "Nuone" | "Kate">("all")
   const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [pullStart, setPullStart] = useState(0)
+  const [pullDistance, setPullDistance] = useState(0)
 
   // Form states
   const [amount, setAmount] = useState("")
@@ -88,6 +92,41 @@ export default function BudgetApp() {
       console.error('Error loading settings:', error)
       setSavingsGoal(150000) // Fallback to default
     }
+  }
+
+  // Refresh data function
+  const refreshData = async () => {
+    setRefreshing(true)
+    try {
+      await Promise.all([loadTransactions(), loadSettings()])
+    } catch (error) {
+      console.error('Error refreshing data:', error)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  // Pull-to-refresh handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      setPullStart(e.touches[0].clientY)
+    }
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (pullStart > 0 && window.scrollY === 0) {
+      const currentY = e.touches[0].clientY
+      const distance = Math.max(0, currentY - pullStart)
+      setPullDistance(Math.min(distance, 120)) // Max pull distance of 120px
+    }
+  }
+
+  const handleTouchEnd = () => {
+    if (pullDistance > 80 && !refreshing) {
+      refreshData()
+    }
+    setPullStart(0)
+    setPullDistance(0)
   }
 
   // Calculate totals (including both income and savings as positive)
@@ -277,7 +316,33 @@ export default function BudgetApp() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div 
+      className="min-h-screen bg-gray-50 p-4"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      style={{
+        transform: `translateY(${pullDistance}px)`,
+        transition: pullDistance === 0 ? 'transform 0.3s ease-out' : 'none'
+      }}
+    >
+      {/* Pull-to-refresh indicator */}
+      {pullDistance > 0 && (
+        <div 
+          className="fixed top-0 left-1/2 transform -translate-x-1/2 z-50 bg-white rounded-full shadow-lg p-3 transition-all duration-200"
+          style={{
+            opacity: Math.min(pullDistance / 80, 1),
+            transform: `translateX(-50%) translateY(${Math.max(pullDistance - 40, 10)}px)`
+          }}
+        >
+          <div className={`w-6 h-6 border-2 border-green-600 rounded-full ${refreshing || pullDistance > 80 ? 'animate-spin border-t-transparent' : ''}`}>
+            {!refreshing && pullDistance <= 80 && (
+              <ArrowDownRight className="w-4 h-4 text-green-600 mt-0.5 ml-0.5" />
+            )}
+          </div>
+        </div>
+      )}
+      
       <div className="max-w-sm mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -285,6 +350,17 @@ export default function BudgetApp() {
             <h1 className="text-2xl font-bold text-gray-900">Budget Tracker</h1>
             <p className="text-gray-600 text-xs mt-1">Wealth begins where impulse ends.</p>
           </div>
+          
+          {/* Refresh Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={refreshData}
+            disabled={refreshing}
+            className="text-gray-500 hover:text-gray-900 p-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </Button>
           
           {/* User Toggle */}
           <div className="bg-white rounded-2xl p-1 shadow-sm border border-gray-100">
