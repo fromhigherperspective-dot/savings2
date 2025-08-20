@@ -393,7 +393,7 @@ export default function BudgetApp() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Budget Tracker</h1>
+            <h1 className="text-xl font-bold text-gray-900">Tinigom nato</h1>
           </div>
           
           {/* Right side - Refresh Button and User Toggle */}
@@ -418,9 +418,10 @@ export default function BudgetApp() {
                 size="sm"
                 className={`rounded-xl px-4 text-sm font-medium transition-all ${
                   selectedUser === "Nuone"
-                    ? "bg-green-600 text-white shadow-sm"
+                    ? "text-white shadow-sm"
                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                 }`}
+                style={selectedUser === "Nuone" ? { backgroundColor: '#2c6fbb' } : {}}
                 onClick={() => setSelectedUser("Nuone")}
               >
                 Nuone
@@ -430,9 +431,10 @@ export default function BudgetApp() {
                 size="sm"
                 className={`rounded-xl px-4 text-sm font-medium transition-all ${
                   selectedUser === "Kate"
-                    ? "bg-green-600 text-white shadow-sm"
+                    ? "text-white shadow-sm"
                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                 }`}
+                style={selectedUser === "Kate" ? { backgroundColor: '#C11C84' } : {}}
                 onClick={() => setSelectedUser("Kate")}
               >
                 Kate
@@ -552,8 +554,8 @@ export default function BudgetApp() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 font-semibold">N</span>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#e6f0ff' }}>
+                  <span className="font-semibold" style={{ color: '#2c6fbb' }}>N</span>
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">Nuone</p>
@@ -565,8 +567,8 @@ export default function BudgetApp() {
             
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center">
-                  <span className="text-pink-600 font-semibold">K</span>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#fde7f3' }}>
+                  <span className="font-semibold" style={{ color: '#C11C84' }}>K</span>
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">Kate</p>
