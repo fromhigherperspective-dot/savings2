@@ -10,8 +10,8 @@ const dmSans = DM_Sans({
 })
 
 export const metadata: Metadata = {
-  title: "Budget Tracker - Glassmorphism",
-  description: "Modern budget management app with glassmorphism design",
+  title: "Tinigom nato",
+  description: "Modern savings management app for tracking your financial goals",
   generator: "v0.app",
 }
 
