@@ -347,8 +347,8 @@ export default function BudgetApp() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Budget Tracker</h1>
-            <p className="text-gray-600 text-xs mt-1">Wealth begins where impulse ends.</p>
+            <h1 className="text-xl font-bold text-gray-900">Budget Tracker</h1>
+            <p className="text-gray-600 text-[11px] mt-1">Wealth begins where impulse ends.</p>
           </div>
           
           {/* Right side - Refresh Button and User Toggle */}
