@@ -62,6 +62,7 @@ export default function BudgetApp() {
   
   // Loading screen state
   const [showLoadingScreen, setShowLoadingScreen] = useState(false)
+  const [loadingFadeOut, setLoadingFadeOut] = useState(false)
   const [appReady, setAppReady] = useState(false)
   const [inactivityTimer, setInactivityTimer] = useState<NodeJS.Timeout | null>(null)
 
@@ -77,10 +78,17 @@ export default function BudgetApp() {
     const twelveHourTimer = setTimeout(() => {
       // Show loading screen after 12 hours of inactivity
       setShowLoadingScreen(true)
+      setLoadingFadeOut(false)
       
-      // Show loading for 2.5 seconds then return to app
+      // Show loading for 2.5 seconds then start fade out
       setTimeout(() => {
-        setShowLoadingScreen(false)
+        setLoadingFadeOut(true) // Start fade out
+        
+        // Remove loading screen after fade completes
+        setTimeout(() => {
+          setShowLoadingScreen(false)
+          setLoadingFadeOut(false)
+        }, 1000) // Wait for 1s fade duration
       }, 2500)
       
     }, 12 * 60 * 60 * 1000) // 12 hours
@@ -107,17 +115,28 @@ export default function BudgetApp() {
     if (showLoadingOnStart) {
       // Show loading screen on server restart
       setShowLoadingScreen(true)
+      setLoadingFadeOut(false)
       
-      // Show loading for 2.5 seconds then load app
+      // Load app data while loading screen is showing
       setTimeout(() => {
-        setShowLoadingScreen(false)
         setAppReady(true)
         loadTransactions()
         loadSettings()
         loadMotivationalQuote()
+      }, 1000) // Load data early
+      
+      // Show loading for 2.5 seconds then start fade out
+      setTimeout(() => {
+        setLoadingFadeOut(true) // Start fade out
         
-        // Start activity tracking after loading
+        // Start activity tracking during fade
         updateActivity()
+        
+        // Remove loading screen after fade completes
+        setTimeout(() => {
+          setShowLoadingScreen(false)
+          setLoadingFadeOut(false)
+        }, 1000) // Wait for 1s fade duration
       }, 2500)
     } else {
       // Load app immediately if no server restart
@@ -396,21 +415,39 @@ export default function BudgetApp() {
   // Apple-style Loading Screen Component
   const LoadingScreen = () => {
     return (
-      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">
+      <div className={`fixed inset-0 bg-white flex flex-col items-center justify-center z-50 transition-opacity duration-1000 ease-out ${loadingFadeOut ? 'opacity-0' : 'opacity-100'}`}>
         <div className="text-center">
-          {/* App title with animation */}
-          <div className="space-y-2 animate-pulse mb-8">
+          {/* App title - clean and static */}
+          <div className="space-y-1 mb-4">
             <h1 className="text-3xl font-light text-black tracking-wide">Tinigom nato</h1>
-            <p className="text-gray-500 text-lg font-light">Loading your savings journey</p>
+            <p className="text-gray-500 text-sm font-light">Loading your savings journey</p>
           </div>
           
           {/* Animated dots */}
-          <div className="flex justify-center space-x-1">
-            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          <div className="flex justify-center space-x-2">
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-dot-flow" style={{ animationDelay: '0ms' }}></div>
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-dot-flow" style={{ animationDelay: '0.2s' }}></div>
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-dot-flow" style={{ animationDelay: '0.4s' }}></div>
           </div>
         </div>
+        
+        {/* Custom styles for dot animation */}
+        <style jsx>{`
+          @keyframes dot-flow {
+            0%, 70%, 100% {
+              transform: translateY(0px);
+              opacity: 0.3;
+            }
+            35% {
+              transform: translateY(-6px);
+              opacity: 0.9;
+            }
+          }
+          
+          .animate-dot-flow {
+            animation: dot-flow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+          }
+        `}</style>
       </div>
     )
   }
@@ -459,17 +496,13 @@ export default function BudgetApp() {
     )
   }
 
-  // Show loading screen if needed
-  if (showLoadingScreen) {
-    return <LoadingScreen />
-  }
-
-  // Don't render main app until ready
-  if (!appReady) {
-    return null
-  }
-
   return (
+    <>
+      {/* Loading screen with fade transition - always render when showing */}
+      {showLoadingScreen && <LoadingScreen />}
+      
+      {/* Main app - only render when ready */}
+      {appReady && (
     <div 
       className="min-h-screen bg-gray-50 p-4"
       onTouchStart={handleTouchStart}
@@ -984,5 +1017,7 @@ export default function BudgetApp() {
         </div>
       )}
     </div>
+      )}
+    </>
   )
 }
