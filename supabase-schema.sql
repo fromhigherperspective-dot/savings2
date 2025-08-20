@@ -39,6 +39,28 @@ CREATE INDEX idx_transactions_user ON transactions("user");
 CREATE INDEX idx_transactions_type ON transactions(type);
 CREATE INDEX idx_transactions_date ON transactions(date);
 
+-- Create motivational quotes table for caching
+CREATE TABLE motivational_quotes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  quote TEXT NOT NULL,
+  target_user TEXT NOT NULL CHECK (target_user IN ('Nuone', 'Kate')),
+  quote_number INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+-- Insert default quote
+INSERT INTO motivational_quotes (quote, target_user, quote_number, expires_at) 
+VALUES ('Wealth begins where impulse ends.', 'Nuone', 1, NOW() + INTERVAL '12 hours');
+
+-- Enable RLS for quotes table
+ALTER TABLE motivational_quotes ENABLE ROW LEVEL SECURITY;
+
+-- Create policy for quotes
+CREATE POLICY "Allow all operations on quotes" ON motivational_quotes
+  FOR ALL USING (true);
+
 -- Enable real-time subscriptions
 ALTER PUBLICATION supabase_realtime ADD TABLE transactions;
 ALTER PUBLICATION supabase_realtime ADD TABLE settings;
+ALTER PUBLICATION supabase_realtime ADD TABLE motivational_quotes;

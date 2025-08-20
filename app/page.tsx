@@ -46,6 +46,7 @@ export default function BudgetApp() {
   const [filterType, setFilterType] = useState<"all" | "withdrawal" | "savings" | "income">("all")
   const [filterMonth, setFilterMonth] = useState<string>("all")
   const [filterUser, setFilterUser] = useState<"all" | "Nuone" | "Kate">("all")
+  const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [pullStart, setPullStart] = useState(0)
@@ -56,11 +57,25 @@ export default function BudgetApp() {
   const [category, setCategory] = useState("")
   const [reason, setReason] = useState("")
 
+  // Motivational quote state
+  const [motivationalQuote, setMotivationalQuote] = useState("Wealth begins where impulse ends.")
+
   // Load data from database on component mount
   useEffect(() => {
     loadTransactions()
     loadSettings()
+    loadMotivationalQuote()
+    
+    // Set up interval to check for new quotes every 12 hours
+    const quoteInterval = setInterval(loadMotivationalQuote, 12 * 60 * 60 * 1000) // 12 hours
+    
+    return () => clearInterval(quoteInterval)
   }, [])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterType, filterMonth, filterUser])
 
   const loadTransactions = async () => {
     try {
@@ -94,11 +109,27 @@ export default function BudgetApp() {
     }
   }
 
+  const loadMotivationalQuote = async () => {
+    try {
+      const response = await fetch('/api/motivational-quote')
+      if (response.ok) {
+        const data = await response.json()
+        setMotivationalQuote(data.quote || "Wealth begins where impulse ends.")
+      } else {
+        console.error('Failed to load motivational quote - using default')
+        setMotivationalQuote("Wealth begins where impulse ends.")
+      }
+    } catch (error) {
+      console.error('Error loading motivational quote:', error)
+      setMotivationalQuote("Wealth begins where impulse ends.")
+    }
+  }
+
   // Refresh data function
   const refreshData = async () => {
     setRefreshing(true)
     try {
-      await Promise.all([loadTransactions(), loadSettings()])
+      await Promise.all([loadTransactions(), loadSettings(), loadMotivationalQuote()])
     } catch (error) {
       console.error('Error refreshing data:', error)
     } finally {
@@ -271,6 +302,21 @@ export default function BudgetApp() {
     return filtered
   }
 
+  const getPaginatedTransactions = () => {
+    const filtered = getFilteredTransactions()
+    const sorted = filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    
+    const itemsPerPage = 5
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    
+    return {
+      transactions: sorted.slice(startIndex, endIndex),
+      totalPages: Math.ceil(sorted.length / itemsPerPage),
+      totalTransactions: sorted.length
+    }
+  }
+
   const CircularProgress = ({ percentage, size = 120, strokeWidth = 8 }: { percentage: number, size?: number, strokeWidth?: number }) => {
     const radius = (size - strokeWidth) / 2
     const circumference = radius * 2 * Math.PI
@@ -348,7 +394,6 @@ export default function BudgetApp() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-xl font-bold text-gray-900">Budget Tracker</h1>
-            <p className="text-gray-600 text-[11px] mt-1">Wealth begins where impulse ends.</p>
           </div>
           
           {/* Right side - Refresh Button and User Toggle */}
@@ -447,6 +492,11 @@ export default function BudgetApp() {
           
           <div className="flex items-center justify-center">
             <CircularProgress percentage={savingsProgress} />
+          </div>
+          
+          {/* Motivational Quote under pie chart */}
+          <div className="text-center mt-4 pt-4 border-t border-gray-100">
+            <p className="text-gray-700 text-sm font-medium italic">"{motivationalQuote}"</p>
           </div>
         </div>
 
@@ -607,58 +657,109 @@ export default function BudgetApp() {
           </div>
           
           {transactions.length > 0 ? (
-            <div className="space-y-3">
-              {getFilteredTransactions()
-                .slice(-10)
-                .reverse()
-                .map((transaction) => (
-                  <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                    <div className="flex items-center space-x-3">
-                      <div
-                        className={`p-2 rounded-xl ${
-                          transaction.type === "withdrawal" 
-                            ? "bg-red-100" 
-                            : "bg-green-100"
-                        }`}
-                      >
-                        {transaction.type === "withdrawal" ? (
-                          <ArrowDownRight className="h-4 w-4 text-red-600" />
-                        ) : (
-                          <ArrowUpRight className="h-4 w-4 text-green-600" />
+            <>
+              <div className="space-y-3">
+                {getPaginatedTransactions().transactions.map((transaction) => (
+                    <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className={`p-2 rounded-xl ${
+                            transaction.type === "withdrawal" 
+                              ? "bg-red-100" 
+                              : "bg-green-100"
+                          }`}
+                        >
+                          {transaction.type === "withdrawal" ? (
+                            <ArrowDownRight className="h-4 w-4 text-red-600" />
+                          ) : (
+                            <ArrowUpRight className="h-4 w-4 text-green-600" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900 text-sm">
+                            {transaction.category || transaction.reason || transaction.type}
+                          </p>
+                          <p className="text-gray-500 text-xs">
+                            {transaction.user} • {new Date(transaction.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <p
+                          className={`font-semibold text-sm ${
+                            transaction.type === "withdrawal" ? "text-red-600" : "text-green-600"
+                          }`}
+                        >
+                          {transaction.type === "withdrawal" ? "-" : "+"}
+                          AED {transaction.amount.toLocaleString()}
+                        </p>
+                        {selectedUser === "Nuone" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteTransaction(transaction.id)}
+                            className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 h-6 w-6"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         )}
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900 text-sm">
-                          {transaction.category || transaction.reason || transaction.type}
-                        </p>
-                        <p className="text-gray-500 text-xs">
-                          {transaction.user} • {new Date(transaction.date).toLocaleDateString()}
-                        </p>
-                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <p
-                        className={`font-semibold text-sm ${
-                          transaction.type === "withdrawal" ? "text-red-600" : "text-green-600"
-                        }`}
-                      >
-                        {transaction.type === "withdrawal" ? "-" : "+"}
-                        AED {transaction.amount.toLocaleString()}
+                  ))}
+              </div>
+              
+              {/* Pagination Controls */}
+              {(() => {
+                const { totalPages, totalTransactions } = getPaginatedTransactions()
+                if (totalPages > 1) {
+                  return (
+                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
+                      <p className="text-gray-500 text-xs">
+                        {totalTransactions} transaction{totalTransactions !== 1 ? 's' : ''} total
                       </p>
-                      {selectedUser === "Nuone" && (
+                      <div className="flex items-center space-x-2">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => deleteTransaction(transaction.id)}
-                          className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 h-6 w-6"
+                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                          disabled={currentPage === 1}
+                          className="text-gray-600 hover:text-gray-900 px-2 py-1 text-sm"
                         >
-                          <Trash2 className="h-3 w-3" />
+                          ←
                         </Button>
-                      )}
+                        
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`px-3 py-1 text-sm ${
+                              currentPage === pageNum
+                                ? "bg-green-600 text-white"
+                                : "text-gray-600 hover:text-gray-900"
+                            }`}
+                          >
+                            {pageNum}
+                          </Button>
+                        ))}
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                          disabled={currentPage === totalPages}
+                          className="text-gray-600 hover:text-gray-900 px-2 py-1 text-sm"
+                        >
+                          →
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-            </div>
+                  )
+                }
+                return null
+              })()}
+            </>
           ) : (
             <div className="text-center py-8">
               <p className="text-gray-500 text-sm">No transactions yet. Add some to get started!</p>

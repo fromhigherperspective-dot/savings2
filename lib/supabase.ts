@@ -22,3 +22,12 @@ export interface Settings {
   savings_goal: number
   updated_at?: string
 }
+
+export interface MotivationalQuote {
+  id: string
+  quote: string
+  target_user: 'Nuone' | 'Kate'
+  quote_number: number
+  created_at?: string
+  expires_at: string
+}
