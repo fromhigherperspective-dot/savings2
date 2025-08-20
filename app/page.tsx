@@ -59,17 +59,93 @@ export default function BudgetApp() {
 
   // Motivational quote state
   const [motivationalQuote, setMotivationalQuote] = useState("Wealth begins where impulse ends.")
+  
+  // Loading screen state
+  const [showLoadingScreen, setShowLoadingScreen] = useState(false)
+  const [appReady, setAppReady] = useState(false)
+  const [inactivityTimer, setInactivityTimer] = useState<NodeJS.Timeout | null>(null)
+
+  // Track user activity and manage 12-hour inactivity timer
+  const updateActivity = () => {
+    // Clear existing timer when user is active
+    if (inactivityTimer) {
+      clearTimeout(inactivityTimer)
+      setInactivityTimer(null)
+    }
+    
+    // Start new 12-hour inactivity timer
+    const twelveHourTimer = setTimeout(() => {
+      // Show loading screen after 12 hours of inactivity
+      setShowLoadingScreen(true)
+      
+      // Show loading for 2.5 seconds then return to app
+      setTimeout(() => {
+        setShowLoadingScreen(false)
+      }, 2500)
+      
+    }, 12 * 60 * 60 * 1000) // 12 hours
+    
+    setInactivityTimer(twelveHourTimer)
+  }
+
+  // Check if we should show loading screen on server restart
+  const shouldShowLoadingOnStart = () => {
+    const lastServerStart = localStorage.getItem('lastServerStart')
+    const currentTime = Date.now().toString()
+    
+    if (!lastServerStart || lastServerStart !== currentTime) {
+      localStorage.setItem('lastServerStart', currentTime)
+      return true
+    }
+    return false
+  }
 
   // Load data from database on component mount
   useEffect(() => {
-    loadTransactions()
-    loadSettings()
-    loadMotivationalQuote()
+    const showLoadingOnStart = shouldShowLoadingOnStart()
+    
+    if (showLoadingOnStart) {
+      // Show loading screen on server restart
+      setShowLoadingScreen(true)
+      
+      // Show loading for 2.5 seconds then load app
+      setTimeout(() => {
+        setShowLoadingScreen(false)
+        setAppReady(true)
+        loadTransactions()
+        loadSettings()
+        loadMotivationalQuote()
+        
+        // Start activity tracking after loading
+        updateActivity()
+      }, 2500)
+    } else {
+      // Load app immediately if no server restart
+      setAppReady(true)
+      loadTransactions()
+      loadSettings()
+      loadMotivationalQuote()
+      
+      // Start activity tracking immediately
+      updateActivity()
+    }
+    
+    // Add activity listeners
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click']
+    activityEvents.forEach(event => {
+      document.addEventListener(event, updateActivity, true)
+    })
     
     // Set up interval to check for new quotes every 12 hours
     const quoteInterval = setInterval(loadMotivationalQuote, 12 * 60 * 60 * 1000) // 12 hours
     
-    return () => clearInterval(quoteInterval)
+    return () => {
+      clearInterval(quoteInterval)
+      if (inactivityTimer) clearTimeout(inactivityTimer)
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, updateActivity, true)
+      })
+    }
   }, [])
 
   // Reset to page 1 when filters change
@@ -317,6 +393,28 @@ export default function BudgetApp() {
     }
   }
 
+  // Apple-style Loading Screen Component
+  const LoadingScreen = () => {
+    return (
+      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">
+        <div className="text-center">
+          {/* App title with animation */}
+          <div className="space-y-2 animate-pulse mb-8">
+            <h1 className="text-3xl font-light text-black tracking-wide">Tinigom nato</h1>
+            <p className="text-gray-500 text-lg font-light">Loading your savings journey</p>
+          </div>
+          
+          {/* Animated dots */}
+          <div className="flex justify-center space-x-1">
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const CircularProgress = ({ percentage, size = 120, strokeWidth = 8 }: { percentage: number, size?: number, strokeWidth?: number }) => {
     const radius = (size - strokeWidth) / 2
     const circumference = radius * 2 * Math.PI
@@ -359,6 +457,16 @@ export default function BudgetApp() {
         </div>
       </div>
     )
+  }
+
+  // Show loading screen if needed
+  if (showLoadingScreen) {
+    return <LoadingScreen />
+  }
+
+  // Don't render main app until ready
+  if (!appReady) {
+    return null
   }
 
   return (
