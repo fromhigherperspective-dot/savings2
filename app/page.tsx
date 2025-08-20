@@ -184,7 +184,26 @@ const SimpleCalendar: React.FC<SimpleCalendarProps> = ({ selectedDate, onSelectD
 }
 
 export default function BudgetApp() {
-  const [selectedUser, setSelectedUser] = useState<"Nuone" | "Kate">("Nuone")
+  // Load saved user preference or default to "Nuone"
+  const getSavedUser = (): "Nuone" | "Kate" => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('selectedUser')
+      if (saved === 'Nuone' || saved === 'Kate') {
+        return saved
+      }
+    }
+    return "Nuone"
+  }
+
+  const [selectedUser, setSelectedUserState] = useState<"Nuone" | "Kate">(getSavedUser())
+  
+  // Function to update selected user and save to localStorage
+  const setSelectedUser = (user: "Nuone" | "Kate") => {
+    setSelectedUserState(user)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selectedUser', user)
+    }
+  }
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [savingsGoal, setSavingsGoal] = useState(150000)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -255,6 +274,15 @@ export default function BudgetApp() {
     }
     return false
   }
+
+  // Load saved user preference on client-side mount
+  useEffect(() => {
+    // Ensure we're on client-side and update user if needed
+    const savedUser = getSavedUser()
+    if (savedUser !== selectedUser) {
+      setSelectedUserState(savedUser)
+    }
+  }, [])
 
   // Load data from database on component mount
   useEffect(() => {
