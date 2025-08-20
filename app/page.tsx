@@ -389,27 +389,15 @@ export default function BudgetApp() {
         </div>
       )}
       
-      <div className="max-w-sm mx-auto space-y-6">
+      <div className="max-w-sm mx-auto space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-xl font-bold text-gray-900">Tinigom nato</h1>
           </div>
           
-          {/* Right side - Refresh Button and User Toggle */}
+          {/* Right side - User Toggle and Refresh Button */}
           <div className="flex items-center gap-3">
-            {/* Refresh Button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={refreshData}
-              disabled={refreshing}
-              className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 p-2 flex-shrink-0 min-w-[40px] h-[40px] border border-gray-200"
-              title="Refresh data"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            </Button>
-            
             {/* User Toggle */}
             <div className="bg-white rounded-2xl p-1 shadow-sm border border-gray-100 flex-shrink-0">
             <div className="flex">
@@ -441,6 +429,18 @@ export default function BudgetApp() {
               </Button>
             </div>
             </div>
+            
+            {/* Refresh Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={refreshData}
+              disabled={refreshing}
+              className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 p-2 flex-shrink-0 min-w-[40px] h-[40px] border border-gray-200"
+              title="Refresh data"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
 
