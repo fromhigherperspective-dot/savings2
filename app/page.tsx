@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
 import {
   Plus,
@@ -24,6 +25,9 @@ import {
   PiggyBank,
   CreditCard,
   RefreshCw,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 
 interface Transaction {
@@ -36,6 +40,149 @@ interface Transaction {
   date: Date | string
 }
 
+// Simple Calendar Component
+interface SimpleCalendarProps {
+  selectedDate?: Date
+  onSelectDate: (date: Date | undefined) => void
+}
+
+const SimpleCalendar: React.FC<SimpleCalendarProps> = ({ selectedDate, onSelectDate }) => {
+  const today = new Date()
+  const [currentMonth, setCurrentMonth] = useState(today)
+  
+  const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate()
+  const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay()
+  
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ]
+  
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  
+  const goToPreviousMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))
+  }
+  
+  const goToNextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))
+  }
+  
+  const selectDate = (day: number) => {
+    const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
+    onSelectDate(newDate)
+  }
+  
+  const isSelectedDate = (day: number) => {
+    if (!selectedDate) return false
+    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
+    return (
+      date.getDate() === selectedDate.getDate() &&
+      date.getMonth() === selectedDate.getMonth() &&
+      date.getFullYear() === selectedDate.getFullYear()
+    )
+  }
+  
+  const isTodayDate = (day: number) => {
+    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
+    return (
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+    )
+  }
+  
+  const renderCalendarDays = () => {
+    const days = []
+    
+    // Empty cells for days before the first day of the month
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      days.push(<div key={`empty-${i}`} className="w-8 h-8"></div>)
+    }
+    
+    // Days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const isSelected = isSelectedDate(day)
+      const isToday = isTodayDate(day)
+      
+      let dayClasses = 'w-8 h-8 text-sm rounded-md transition-colors '
+      
+      if (isSelected) {
+        dayClasses += 'bg-green-600 text-white hover:bg-green-700'
+      } else if (isToday) {
+        dayClasses += 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300'
+      } else {
+        dayClasses += 'text-gray-900 hover:bg-gray-100'
+      }
+      
+      days.push(
+        <button
+          key={day}
+          onClick={() => selectDate(day)}
+          className={dayClasses}
+        >
+          {day}
+        </button>
+      )
+    }
+    
+    return days
+  }
+  
+  return (
+    <div className="p-4 bg-white">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={goToPreviousMonth}
+          className="p-1 hover:bg-gray-100 rounded-md transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        
+        <h3 className="font-medium text-gray-900">
+          {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+        </h3>
+        
+        <button
+          onClick={goToNextMonth}
+          className="p-1 hover:bg-gray-100 rounded-md transition-colors"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+      
+      {/* Day names */}
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {dayNames.map(day => (
+          <div key={day} className="w-8 h-6 text-xs text-gray-500 text-center">
+            {day}
+          </div>
+        ))}
+      </div>
+      
+      {/* Calendar days */}
+      <div className="grid grid-cols-7 gap-1">
+        {renderCalendarDays()}
+      </div>
+      
+      {/* Clear button */}
+      {selectedDate && (
+        <div className="mt-4 pt-3 border-t">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onSelectDate(undefined)}
+            className="w-full text-gray-600 hover:text-gray-900"
+          >
+            Clear date
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function BudgetApp() {
   const [selectedUser, setSelectedUser] = useState<"Nuone" | "Kate">("Nuone")
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -45,6 +192,7 @@ export default function BudgetApp() {
 
   const [filterType, setFilterType] = useState<"all" | "withdrawal" | "savings" | "income">("all")
   const [filterMonth, setFilterMonth] = useState<string>("all")
+  const [filterDate, setFilterDate] = useState<Date | undefined>(undefined)
   const [filterUser, setFilterUser] = useState<"all" | "Nuone" | "Kate">("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -170,7 +318,7 @@ export default function BudgetApp() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [filterType, filterMonth, filterUser])
+  }, [filterType, filterDate, filterUser])
 
   const loadTransactions = async () => {
     try {
@@ -382,12 +530,23 @@ export default function BudgetApp() {
     let filtered = transactions
 
     if (filterType !== "all") {
-      filtered = filtered.filter((t) => t.type === filterType)
+      // Map "savings" filter to show "income" transactions (money added)
+      if (filterType === "savings") {
+        filtered = filtered.filter((t) => t.type === "income")
+      } else {
+        filtered = filtered.filter((t) => t.type === filterType)
+      }
     }
 
-    if (filterMonth !== "all") {
-      const month = Number.parseInt(filterMonth)
-      filtered = filtered.filter((t) => new Date(t.date).getMonth() === month)
+    if (filterDate) {
+      filtered = filtered.filter((t) => {
+        const transactionDate = new Date(t.date)
+        return (
+          transactionDate.getFullYear() === filterDate.getFullYear() &&
+          transactionDate.getMonth() === filterDate.getMonth() &&
+          transactionDate.getDate() === filterDate.getDate()
+        )
+      })
     }
 
     if (filterUser !== "all") {
@@ -755,8 +914,8 @@ export default function BudgetApp() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="withdrawal">Withdrawals</SelectItem>
-                    <SelectItem value="savings">Savings</SelectItem>
+                    <SelectItem value="withdrawal">W</SelectItem>
+                    <SelectItem value="savings">S</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -773,28 +932,25 @@ export default function BudgetApp() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label className="text-gray-700 text-sm">Month</Label>
-                <Select value={filterMonth} onValueChange={setFilterMonth}>
-                  <SelectTrigger className="glass-input text-gray-900 text-sm mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="0">January</SelectItem>
-                    <SelectItem value="1">February</SelectItem>
-                    <SelectItem value="2">March</SelectItem>
-                    <SelectItem value="3">April</SelectItem>
-                    <SelectItem value="4">May</SelectItem>
-                    <SelectItem value="5">June</SelectItem>
-                    <SelectItem value="6">July</SelectItem>
-                    <SelectItem value="7">August</SelectItem>
-                    <SelectItem value="8">September</SelectItem>
-                    <SelectItem value="9">October</SelectItem>
-                    <SelectItem value="10">November</SelectItem>
-                    <SelectItem value="11">December</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex justify-end">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button 
+                      type="button"
+                      className="flex items-center cursor-pointer p-2 hover:bg-gray-50 rounded-md transition-colors"
+                    >
+                      <CalendarDays className={`h-8 w-8 transition-colors ${
+                        filterDate ? "text-gray-700 hover:text-gray-900" : "text-gray-400 hover:text-gray-600"
+                      }`} />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <SimpleCalendar 
+                      selectedDate={filterDate}
+                      onSelectDate={setFilterDate}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           </div>
