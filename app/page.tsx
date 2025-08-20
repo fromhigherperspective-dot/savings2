@@ -351,19 +351,22 @@ export default function BudgetApp() {
             <p className="text-gray-600 text-xs mt-1">Wealth begins where impulse ends.</p>
           </div>
           
-          {/* Refresh Button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={refreshData}
-            disabled={refreshing}
-            className="text-gray-500 hover:text-gray-900 p-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          </Button>
-          
-          {/* User Toggle */}
-          <div className="bg-white rounded-2xl p-1 shadow-sm border border-gray-100">
+          {/* Right side - Refresh Button and User Toggle */}
+          <div className="flex items-center gap-3">
+            {/* Refresh Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={refreshData}
+              disabled={refreshing}
+              className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 p-2 flex-shrink-0 min-w-[40px] h-[40px] border border-gray-200"
+              title="Refresh data"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            
+            {/* User Toggle */}
+            <div className="bg-white rounded-2xl p-1 shadow-sm border border-gray-100 flex-shrink-0">
             <div className="flex">
               <Button
                 variant={selectedUser === "Nuone" ? "default" : "ghost"}
@@ -389,6 +392,7 @@ export default function BudgetApp() {
               >
                 Kate
               </Button>
+            </div>
             </div>
           </div>
         </div>
