@@ -23,7 +23,7 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { savings_goal } = body
+    const { savings_goal, target_months, target_start_date } = body
 
     if (!savings_goal || isNaN(parseFloat(savings_goal))) {
       return NextResponse.json(
@@ -32,12 +32,22 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    const updateData: any = { 
+      savings_goal: parseFloat(savings_goal),
+      updated_at: new Date().toISOString()
+    }
+
+    if (target_months !== undefined) {
+      updateData.target_months = target_months ? parseInt(target_months) : null
+    }
+
+    if (target_start_date !== undefined) {
+      updateData.target_start_date = target_start_date
+    }
+
     const { data: settings, error } = await supabase
       .from('settings')
-      .update({ 
-        savings_goal: parseFloat(savings_goal),
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', 1)
       .select()
       .single()

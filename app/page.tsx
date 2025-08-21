@@ -130,7 +130,7 @@ const SimpleCalendar: React.FC<SimpleCalendarProps> = ({ selectedDate, onSelectD
   }
   
   return (
-    <div className="p-4 bg-white">
+    <div className="p-4 bg-gray-50">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <button
@@ -206,6 +206,8 @@ export default function BudgetApp() {
   }
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [savingsGoal, setSavingsGoal] = useState(150000)
+  const [targetMonths, setTargetMonths] = useState<number>(0)
+  const [targetStartDate, setTargetStartDate] = useState<Date | null>(null)
 
   const [filterType, setFilterType] = useState<"all" | "withdrawal" | "savings" | "income">("all")
   const [filterMonth, setFilterMonth] = useState<string>("all")
@@ -218,8 +220,13 @@ export default function BudgetApp() {
   const [pullDistance, setPullDistance] = useState(0)
 
 
+
   // Motivational quote state
   const [motivationalQuote, setMotivationalQuote] = useState("Wealth begins where impulse ends.")
+  
+  // Success likelihood and animation state
+  const [showSuccessLikelihood, setShowSuccessLikelihood] = useState(false)
+  const [isTransitioning, setIsTransitioning] = useState(false)
   
   // Loading screen state
   const [showLoadingScreen, setShowLoadingScreen] = useState(false)
@@ -328,8 +335,20 @@ export default function BudgetApp() {
     // Set up interval to check for new quotes every 12 hours
     const quoteInterval = setInterval(loadMotivationalQuote, 12 * 60 * 60 * 1000) // 12 hours
     
+    // Set up smooth fade animation between quote and success likelihood every 5 seconds
+    const fadeInterval = setInterval(() => {
+      setIsTransitioning(true)
+      
+      setTimeout(() => {
+        setShowSuccessLikelihood(prev => !prev)
+        setIsTransitioning(false)
+      }, 518) // 518ms fade out duration (20% more slower)
+      
+    }, 7000) // 7 seconds
+    
     return () => {
       clearInterval(quoteInterval)
+      clearInterval(fadeInterval)
       if (inactivityTimer) clearTimeout(inactivityTimer)
       activityEvents.forEach(event => {
         document.removeEventListener(event, updateActivity, true)
@@ -364,13 +383,19 @@ export default function BudgetApp() {
       if (response.ok) {
         const data = await response.json()
         setSavingsGoal(data.settings?.savings_goal || 150000)
+        setTargetMonths(data.settings?.target_months || 0)
+        setTargetStartDate(data.settings?.target_start_date ? new Date(data.settings.target_start_date) : null)
       } else {
         console.error('Failed to load settings - using default')
         setSavingsGoal(150000) // Fallback to default
+        setTargetMonths(0) // Fallback to 0
+        setTargetStartDate(null) // Fallback to null
       }
     } catch (error) {
       console.error('Error loading settings:', error)
       setSavingsGoal(150000) // Fallback to default
+      setTargetMonths(0) // Fallback to 0
+      setTargetStartDate(null) // Fallback to null
     }
   }
 
@@ -438,6 +463,109 @@ export default function BudgetApp() {
   const grandTotal = userTotals.Nuone + userTotals.Kate
   const savingsProgress = Math.min((grandTotal / savingsGoal) * 100, 100)
   
+  // Calculate individual contribution percentages against the overall goal
+  const nuoneContributionPercentage = savingsGoal > 0 ? (userTotals.Nuone / savingsGoal) * 100 : 0
+  const kateContributionPercentage = savingsGoal > 0 ? (userTotals.Kate / savingsGoal) * 100 : 0
+  
+  // Calculate monthly saving rate and prediction based on current date
+  const calculateSavingPrediction = () => {
+    if (targetMonths === 0) return null
+    
+    const now = new Date()
+    const remainingAmount = Math.max(0, savingsGoal - grandTotal)
+    
+    // Calculate how many months remain from today to reach the target date
+    let remainingMonths = targetMonths
+    
+    if (targetStartDate) {
+      // Calculate the target end date
+      const targetEndDate = new Date(targetStartDate)
+      targetEndDate.setMonth(targetEndDate.getMonth() + targetMonths)
+      
+      // Calculate months remaining from today to target end date
+      const monthsDiff = (targetEndDate.getFullYear() - now.getFullYear()) * 12 + 
+                        (targetEndDate.getMonth() - now.getMonth()) + 
+                        (targetEndDate.getDate() - now.getDate()) / 30
+      
+      remainingMonths = Math.max(0, Math.round(monthsDiff * 10) / 10) // Round to 1 decimal
+    } else {
+      // If no start date is set, we can't calculate remaining months accurately
+      // For now, we'll assume the full target duration remains
+      // But ideally, user should set a new goal to get accurate calculations
+      remainingMonths = targetMonths
+    }
+    
+    if (remainingMonths <= 0) {
+      return {
+        requiredMonthlySaving: 0,
+        currentMonthlySaving: 0,
+        isAchievable: true,
+        shortfall: 0,
+        targetReached: true,
+        remainingAmount,
+        remainingMonths: 0
+      }
+    }
+    
+    const requiredMonthlySaving = remainingAmount / remainingMonths
+    
+    // Calculate current monthly saving rate (last 3 months average)
+    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate())
+    
+    const recentTransactions = transactions.filter(t => 
+      new Date(t.date) >= threeMonthsAgo && t.type === 'income'
+    )
+    
+    const recentSavings = recentTransactions.reduce((sum, t) => sum + t.amount, 0)
+    const monthlyAverage = recentSavings / 3
+    
+    return {
+      requiredMonthlySaving,
+      currentMonthlySaving: monthlyAverage,
+      isAchievable: monthlyAverage >= requiredMonthlySaving,
+      shortfall: Math.max(0, requiredMonthlySaving - monthlyAverage),
+      remainingAmount,
+      remainingMonths,
+      targetReached: remainingAmount <= 0
+    }
+  }
+  
+  const prediction = calculateSavingPrediction()
+  
+  // Calculate success likelihood based on current trends
+  const calculateSuccessLikelihood = () => {
+    if (!prediction || targetMonths === 0) return 50
+    
+    const currentProgress = (grandTotal / savingsGoal) * 100
+    const timeElapsed = targetStartDate ? 
+      ((new Date().getTime() - new Date(targetStartDate).getTime()) / (1000 * 60 * 60 * 24 * 30)) : 1
+    const expectedProgressByNow = (timeElapsed / targetMonths) * 100
+    
+    // Calculate success likelihood based on current performance vs expected
+    let successLikelihood = 50 // Base 50%
+    
+    if (currentProgress >= expectedProgressByNow) {
+      // Ahead of schedule - higher likelihood
+      const performanceRatio = currentProgress / Math.max(expectedProgressByNow, 1)
+      successLikelihood = Math.min(95, 50 + (performanceRatio * 30))
+    } else {
+      // Behind schedule - lower likelihood
+      const performanceRatio = currentProgress / Math.max(expectedProgressByNow, 1)
+      successLikelihood = Math.max(15, 50 * performanceRatio)
+    }
+    
+    // Factor in recent saving trends (last 3 months)
+    if (prediction.currentMonthlySaving >= prediction.requiredMonthlySaving) {
+      successLikelihood = Math.min(95, successLikelihood + 20)
+    } else {
+      successLikelihood = Math.max(10, successLikelihood - 15)
+    }
+    
+    return Math.round(successLikelihood)
+  }
+  
+  const successLikelihood = calculateSuccessLikelihood()
+  
   const totalIncome = transactions
     .filter(t => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0)
@@ -450,7 +578,7 @@ export default function BudgetApp() {
     const amount = prompt("Enter deposit amount (AED):")
     if (!amount || isNaN(parseFloat(amount))) return
 
-    const category = prompt("Enter category (optional):")
+    const description = prompt("Enter description (optional):")
 
     setLoading(true)
     try {
@@ -462,7 +590,7 @@ export default function BudgetApp() {
         body: JSON.stringify({
           amount: parseFloat(amount),
           type: 'income',
-          category: category || null,
+          category: description || null,
           user: selectedUser,
         }),
       })
@@ -592,7 +720,7 @@ export default function BudgetApp() {
   // Apple-style Loading Screen Component
   const LoadingScreen = () => {
     return (
-      <div className={`fixed inset-0 bg-white flex items-center justify-center z-50 transition-opacity duration-1000 ease-out ${loadingFadeOut ? 'opacity-0' : 'opacity-100'}`}>
+      <div className={`fixed inset-0 bg-gray-100 flex items-center justify-center z-50 transition-opacity duration-1000 ease-out ${loadingFadeOut ? 'opacity-0' : 'opacity-100'}`}>
         <div className="text-center">
           {/* App title - clean and static */}
           <div className="space-y-1 mb-4 text-center">
@@ -681,7 +809,7 @@ export default function BudgetApp() {
       {/* Main app - only render when ready */}
       {appReady && (
     <div 
-      className="min-h-screen bg-gray-50 p-4"
+      className="min-h-screen bg-gray-100 p-4"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -693,7 +821,7 @@ export default function BudgetApp() {
       {/* Pull-to-refresh indicator */}
       {pullDistance > 0 && (
         <div 
-          className="fixed top-0 left-1/2 transform -translate-x-1/2 z-50 bg-white rounded-full shadow-lg p-3 transition-all duration-200"
+          className="fixed top-0 left-1/2 transform -translate-x-1/2 z-50 bg-gray-50 rounded-full shadow-lg p-3 transition-all duration-200"
           style={{
             opacity: Math.min(pullDistance / 80, 1),
             transform: `translateX(-50%) translateY(${Math.max(pullDistance - 40, 10)}px)`
@@ -717,7 +845,7 @@ export default function BudgetApp() {
           {/* Right side - User Toggle and Refresh Button */}
           <div className="flex items-center gap-3">
             {/* User Toggle */}
-            <div className="bg-white rounded-2xl p-1 shadow-sm border border-gray-100 flex-shrink-0">
+            <div className="bg-gray-50 rounded-2xl p-1 shadow-sm border border-gray-200 flex-shrink-0">
             <div className="flex">
               <Button
                 variant={selectedUser === "Nuone" ? "default" : "ghost"}
@@ -764,20 +892,24 @@ export default function BudgetApp() {
 
         {/* Progress Card - Moved to top */}
         <div className="financial-card">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Savings Goal</h3>
-              <p className="text-gray-600 text-sm">Track your progress</p>
-            </div>
-            {selectedUser === "Nuone" && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={async () => {
+          <div className="mb-6">
+            <div className="flex items-end justify-between">
+              <div style={{ gap: '2px' }} className="flex flex-col">
+                <h3 className="text-lg font-semibold text-gray-900 leading-tight">Savings Goal</h3>
+                <p className="text-gray-600 text-sm leading-tight">Track your progress</p>
+              </div>
+              {selectedUser === "Nuone" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={async () => {
                   const newGoal = prompt("Enter new savings goal:", savingsGoal.toString())
                   if (newGoal && !isNaN(parseFloat(newGoal))) {
+                    const newMonths = prompt("Enter target months (e.g., 12) or leave empty:", targetMonths > 0 ? targetMonths.toString() : "")
                     setLoading(true)
                     try {
+                      const targetStartDateToSave = new Date() // Set start date as today when setting new goal
+                      
                       const response = await fetch('/api/settings', {
                         method: 'PUT',
                         headers: {
@@ -785,11 +917,15 @@ export default function BudgetApp() {
                         },
                         body: JSON.stringify({
                           savings_goal: parseFloat(newGoal),
+                          target_months: newMonths && !isNaN(parseInt(newMonths)) ? parseInt(newMonths) : null,
+                          target_start_date: newMonths && !isNaN(parseInt(newMonths)) ? targetStartDateToSave.toISOString() : null,
                         }),
                       })
 
                       if (response.ok) {
                         setSavingsGoal(parseFloat(newGoal))
+                        setTargetMonths(newMonths && !isNaN(parseInt(newMonths)) ? parseInt(newMonths) : 0)
+                        setTargetStartDate(newMonths && !isNaN(parseInt(newMonths)) ? targetStartDateToSave : null)
                       } else {
                         const error = await response.json()
                         console.error('Failed to update savings goal:', error)
@@ -806,26 +942,57 @@ export default function BudgetApp() {
                 className="text-gray-500 hover:text-gray-900"
               >
                 Edit
-              </Button>
-            )}
+                </Button>
+              )}
+            </div>
           </div>
           
           <div className="flex items-center justify-center">
             <CircularProgress percentage={savingsProgress} />
           </div>
           
-          {/* Motivational Quote under pie chart */}
-          <div className="text-center mt-4 pt-4 border-t border-gray-100">
-            <p className="text-gray-700 text-sm font-medium italic">"{motivationalQuote}"</p>
+          {/* Target and Prediction Info */}
+          {(targetMonths > 0 || prediction) && (
+            <div className="text-center mt-3">
+              <div className="text-xs text-gray-600" style={{ fontSize: '0.715rem' }}>
+                {prediction && prediction.remainingMonths > 0 && `${prediction.remainingMonths} months left`}
+                {prediction && prediction.remainingMonths > 0 && ' | '}
+                {prediction && !prediction.targetReached && (
+                  <span className={prediction.isAchievable ? 'text-green-600' : 'text-orange-600'}>
+                    Need AED {Math.round(prediction.requiredMonthlySaving).toLocaleString()}/month
+                  </span>
+                )}
+                {prediction && prediction.targetReached && (
+                  <span className="text-green-600">Target Reached!</span>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* Motivational Quote and Success Likelihood under pie chart */}
+          <div className="text-center mt-4 pt-4 border-t border-gray-100 relative h-12 flex items-center justify-center">
+            <div 
+              className={`absolute inset-0 flex items-center justify-center transition-opacity duration-[518ms] ease-in-out ${
+                isTransitioning ? 'opacity-0' : 'opacity-100'
+              }`}
+            >
+              {!showSuccessLikelihood ? (
+                <p className="text-gray-700 text-sm font-medium italic">"{motivationalQuote}"</p>
+              ) : (
+                <p className="text-gray-700 text-sm font-medium italic">
+                  {targetMonths > 0 ? `${successLikelihood}% chance of reaching goal by target date` : 'Set a target timeline to see success likelihood'}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Main Balance Card */}
-        <div className="financial-card">
-          <div className="flex items-center justify-between mb-4">
+        <div className="financial-card py-4">
+          <div className="flex items-center justify-between mb-3">
             <div>
               <p className="text-gray-600 text-sm">Total Savings</p>
-              <h2 className="text-3xl font-bold text-gray-900">AED {grandTotal.toLocaleString()}</h2>
+              <h2 className="text-xl font-bold text-gray-900">AED {grandTotal.toLocaleString()}</h2>
             </div>
             <div className="bg-green-100 p-2 rounded-xl">
               <DollarSign className="h-5 w-5 text-green-600 animate-pulse" />
@@ -877,7 +1044,7 @@ export default function BudgetApp() {
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">Nuone</p>
-                  <p className="text-gray-600 text-sm">Personal Account</p>
+                  <p className="text-gray-600 text-sm">{Math.round(nuoneContributionPercentage)}% contributed</p>
                 </div>
               </div>
               <p className="text-lg font-bold text-gray-900">AED {userTotals.Nuone.toLocaleString()}</p>
@@ -890,7 +1057,7 @@ export default function BudgetApp() {
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">Kate</p>
-                  <p className="text-gray-600 text-sm">Personal Account</p>
+                  <p className="text-gray-600 text-sm">{Math.round(kateContributionPercentage)}% contributed</p>
                 </div>
               </div>
               <p className="text-lg font-bold text-gray-900">AED {userTotals.Kate.toLocaleString()}</p>
@@ -980,7 +1147,7 @@ export default function BudgetApp() {
             <>
               <div className="space-y-3">
                 {getPaginatedTransactions().transactions.map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                    <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-100 rounded-xl border border-gray-200">
                       <div className="flex items-center space-x-3">
                         <div
                           className={`p-2 rounded-xl ${
@@ -1085,6 +1252,7 @@ export default function BudgetApp() {
           )}
         </div>
       </div>
+
 
     </div>
       )}
