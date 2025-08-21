@@ -206,8 +206,6 @@ export default function BudgetApp() {
   }
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [savingsGoal, setSavingsGoal] = useState(150000)
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [showWithdrawModal, setShowWithdrawModal] = useState(false)
 
   const [filterType, setFilterType] = useState<"all" | "withdrawal" | "savings" | "income">("all")
   const [filterMonth, setFilterMonth] = useState<string>("all")
@@ -219,10 +217,6 @@ export default function BudgetApp() {
   const [pullStart, setPullStart] = useState(0)
   const [pullDistance, setPullDistance] = useState(0)
 
-  // Form states
-  const [amount, setAmount] = useState("")
-  const [category, setCategory] = useState("")
-  const [reason, setReason] = useState("")
 
   // Motivational quote state
   const [motivationalQuote, setMotivationalQuote] = useState("Wealth begins where impulse ends.")
@@ -453,7 +447,10 @@ export default function BudgetApp() {
     .reduce((sum, t) => sum + t.amount, 0)
 
   const addTransaction = async () => {
-    if (!amount) return
+    const amount = prompt("Enter deposit amount (AED):")
+    if (!amount || isNaN(parseFloat(amount))) return
+
+    const category = prompt("Enter category (optional):")
 
     setLoading(true)
     try {
@@ -472,9 +469,6 @@ export default function BudgetApp() {
 
       if (response.ok) {
         await loadTransactions() // Reload transactions from database
-        setAmount("")
-        setCategory("")
-        setShowAddModal(false)
       } else {
         const error = await response.json()
         console.error('Failed to add transaction:', error)
@@ -489,7 +483,11 @@ export default function BudgetApp() {
   }
 
   const addWithdrawal = async () => {
-    if (!amount || !reason) return
+    const amount = prompt("Enter withdrawal amount (AED):")
+    if (!amount || isNaN(parseFloat(amount))) return
+
+    const reason = prompt("Enter reason:")
+    if (!reason) return
 
     setLoading(true)
     try {
@@ -508,9 +506,6 @@ export default function BudgetApp() {
 
       if (response.ok) {
         await loadTransactions() // Reload transactions from database
-        setAmount("")
-        setReason("")
-        setShowWithdrawModal(false)
       } else {
         const error = await response.json()
         console.error('Failed to add withdrawal:', error)
@@ -525,11 +520,6 @@ export default function BudgetApp() {
   }
 
   const deleteTransaction = async (transactionId: string) => {
-    if (selectedUser !== "Nuone") {
-      alert("Only Nuone can delete transactions.")
-      return
-    }
-
     const confirmDelete = window.confirm("Are you sure you want to delete this transaction?")
     if (!confirmDelete) return
 
@@ -602,16 +592,16 @@ export default function BudgetApp() {
   // Apple-style Loading Screen Component
   const LoadingScreen = () => {
     return (
-      <div className={`fixed inset-0 bg-white flex flex-col items-center justify-center z-50 transition-opacity duration-1000 ease-out ${loadingFadeOut ? 'opacity-0' : 'opacity-100'}`}>
+      <div className={`fixed inset-0 bg-white flex items-center justify-center z-50 transition-opacity duration-1000 ease-out ${loadingFadeOut ? 'opacity-0' : 'opacity-100'}`}>
         <div className="text-center">
           {/* App title - clean and static */}
-          <div className="space-y-1 mb-4">
-            <h1 className="text-3xl font-light text-black tracking-wide">Tinigom nato</h1>
-            <p className="text-gray-500 text-sm font-light">Loading your savings journey</p>
+          <div className="space-y-1 mb-4 text-center">
+            <h1 className="text-3xl font-light text-black tracking-wide text-center">Tinigom nato</h1>
+            <p className="text-gray-500 text-sm font-light text-center">Loading your savings journey</p>
           </div>
           
           {/* Animated dots */}
-          <div className="flex justify-center space-x-2">
+          <div className="flex justify-center items-center space-x-2">
             <div className="w-2 h-2 bg-gray-400 rounded-full animate-dot-flow" style={{ animationDelay: '0ms' }}></div>
             <div className="w-2 h-2 bg-gray-400 rounded-full animate-dot-flow" style={{ animationDelay: '0.2s' }}></div>
             <div className="w-2 h-2 bg-gray-400 rounded-full animate-dot-flow" style={{ animationDelay: '0.4s' }}></div>
@@ -740,7 +730,7 @@ export default function BudgetApp() {
                 style={selectedUser === "Nuone" ? { backgroundColor: '#2c6fbb' } : {}}
                 onClick={() => setSelectedUser("Nuone")}
               >
-                Nuone
+                N
               </Button>
               <Button
                 variant={selectedUser === "Kate" ? "default" : "ghost"}
@@ -753,7 +743,7 @@ export default function BudgetApp() {
                 style={selectedUser === "Kate" ? { backgroundColor: '#C11C84' } : {}}
                 onClick={() => setSelectedUser("Kate")}
               >
-                Kate
+                K
               </Button>
             </div>
             </div>
@@ -835,7 +825,7 @@ export default function BudgetApp() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-gray-600 text-sm">Total Savings</p>
-              <h2 className="text-4xl font-bold text-gray-900">AED {grandTotal.toLocaleString()}</h2>
+              <h2 className="text-3xl font-bold text-gray-900">AED {grandTotal.toLocaleString()}</h2>
             </div>
             <div className="bg-green-100 p-2 rounded-xl">
               <DollarSign className="h-5 w-5 text-green-600 animate-pulse" />
@@ -861,7 +851,7 @@ export default function BudgetApp() {
               <span className="text-green-600 text-sm font-medium">+AED 0</span>
             </div>
             <p className="text-gray-600 text-sm">Total Income</p>
-            <p className="text-2xl font-bold text-gray-900">AED {totalIncome.toLocaleString()}</p>
+            <p className="text-lg font-bold text-gray-900">AED {totalIncome.toLocaleString()}</p>
           </div>
 
           <div className="financial-card">
@@ -872,7 +862,7 @@ export default function BudgetApp() {
               <span className="text-red-600 text-sm font-medium">-AED 0</span>
             </div>
             <p className="text-gray-600 text-sm">Total Expenses</p>
-            <p className="text-2xl font-bold text-gray-900">AED {totalExpenses.toLocaleString()}</p>
+            <p className="text-lg font-bold text-gray-900">AED {totalExpenses.toLocaleString()}</p>
           </div>
         </div>
 
@@ -890,7 +880,7 @@ export default function BudgetApp() {
                   <p className="text-gray-600 text-sm">Personal Account</p>
                 </div>
               </div>
-              <p className="text-xl font-bold text-gray-900">AED {userTotals.Nuone.toLocaleString()}</p>
+              <p className="text-lg font-bold text-gray-900">AED {userTotals.Nuone.toLocaleString()}</p>
             </div>
             
             <div className="flex items-center justify-between">
@@ -903,7 +893,7 @@ export default function BudgetApp() {
                   <p className="text-gray-600 text-sm">Personal Account</p>
                 </div>
               </div>
-              <p className="text-xl font-bold text-gray-900">AED {userTotals.Kate.toLocaleString()}</p>
+              <p className="text-lg font-bold text-gray-900">AED {userTotals.Kate.toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -911,16 +901,18 @@ export default function BudgetApp() {
         {/* Action Buttons */}
         <div className="flex gap-4">
           <Button
-            onClick={() => setShowAddModal(true)}
+            onClick={addTransaction}
             className="flex-1 bg-green-600 hover:bg-green-700 text-white py-5 text-lg font-semibold rounded-2xl transition-all duration-300 hover:scale-105 shadow-lg flex items-center justify-center"
+            style={{ paddingRight: '1.75rem' }}
           >
             <Plus className="mr-2 h-5 w-5" />
-            Save
+            Deposit
           </Button>
           <Button
-            onClick={() => setShowWithdrawModal(true)}
+            onClick={addWithdrawal}
             variant="outline"
-            className="flex-1 border-2 border-gray-200 hover:border-gray-300 text-gray-700 py-5 text-lg font-semibold rounded-2xl transition-all duration-300 hover:scale-105"
+            className="flex-1 border-2 border-gray-200 hover:border-gray-300 text-gray-700 py-5 text-lg font-semibold rounded-2xl transition-all duration-300 hover:scale-105 flex items-center justify-center"
+            style={{ paddingRight: '1.75rem' }}
           >
             <ArrowDownRight className="mr-2 h-5 w-5" />
             Withdraw
@@ -931,9 +923,9 @@ export default function BudgetApp() {
         <div className="financial-card">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Transactions</h3>
           
-          {/* Always visible filters */}
-          <div className="mb-4 p-4 bg-gray-50 rounded-xl">
-            <div className="grid grid-cols-3 gap-3">
+          {/* Filters with separator line */}
+          <div className="mb-4">
+            <div className="grid grid-cols-3 gap-3 mb-4">
               <div>
                 <Label className="text-gray-700 text-sm">Type</Label>
                 <Select value={filterType} onValueChange={(value: any) => setFilterType(value)}>
@@ -981,6 +973,7 @@ export default function BudgetApp() {
                 </Popover>
               </div>
             </div>
+            <hr className="border-gray-200" />
           </div>
           
           {transactions.length > 0 ? (
@@ -1020,16 +1013,14 @@ export default function BudgetApp() {
                           {transaction.type === "withdrawal" ? "-" : "+"}
                           AED {transaction.amount.toLocaleString()}
                         </p>
-                        {selectedUser === "Nuone" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteTransaction(transaction.id)}
-                            className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 h-6 w-6"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteTransaction(transaction.id)}
+                          className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 h-6 w-6"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -1095,111 +1086,6 @@ export default function BudgetApp() {
         </div>
       </div>
 
-      {/* Add Money Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="financial-card w-full max-w-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">Save Money</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAddModal(false)}
-                className="text-gray-500 hover:text-gray-900 p-1"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="amount" className="text-gray-700 text-sm font-medium">
-                  Amount (AED)
-                </Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="glass-input text-gray-900 mt-1"
-                  placeholder="Enter amount"
-                />
-              </div>
-              <div>
-                <Label htmlFor="category" className="text-gray-700 text-sm font-medium">
-                  Category (Optional)
-                </Label>
-                <Input
-                  id="category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="glass-input text-gray-900 mt-1"
-                  placeholder="e.g., Salary, Freelance, Savings"
-                />
-              </div>
-              <Button 
-                onClick={addTransaction} 
-                disabled={loading}
-                className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-medium disabled:opacity-50"
-              >
-                {loading ? "Saving..." : "Save Money"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Withdraw Money Modal */}
-      {showWithdrawModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="financial-card w-full max-w-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">Make Withdrawal</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowWithdrawModal(false)}
-                className="text-gray-500 hover:text-gray-900 p-1"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="withdraw-amount" className="text-gray-700 text-sm font-medium">
-                  Amount (AED)
-                </Label>
-                <Input
-                  id="withdraw-amount"
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="glass-input text-gray-900 mt-1"
-                  placeholder="Enter amount"
-                />
-              </div>
-              <div>
-                <Label htmlFor="reason" className="text-gray-700 text-sm font-medium">
-                  Reason
-                </Label>
-                <Input
-                  id="reason"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  className="glass-input text-gray-900 mt-1"
-                  placeholder="e.g., Groceries, Bills"
-                />
-              </div>
-              <Button 
-                onClick={addWithdrawal} 
-                disabled={loading}
-                className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-medium disabled:opacity-50"
-              >
-                {loading ? "Processing..." : "Make Withdrawal"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
       )}
     </>
