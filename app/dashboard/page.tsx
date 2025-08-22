@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { RefreshCw, Menu, ArrowLeft, Plus, Check, Trash2 } from "lucide-react"
@@ -9,8 +9,9 @@ interface Todo {
   id: string
   text: string
   completed: boolean
-  assignedTo: "N" | "K"
-  createdAt: Date
+  assigned_to: "N" | "K"
+  created_at: string
+  updated_at?: string
 }
 
 export default function DashboardPage() {
@@ -20,50 +21,105 @@ export default function DashboardPage() {
   const [newTodoText, setNewTodoText] = useState("")
   const [selectedPerson, setSelectedPerson] = useState<"N" | "K">("N")
 
-  // Load todos from localStorage on component mount
+  // Load todos from database on component mount
   useEffect(() => {
-    const savedTodos = localStorage.getItem('dashboardTodos')
-    if (savedTodos) {
-      try {
-        const parsedTodos = JSON.parse(savedTodos).map((todo: any) => ({
-          ...todo,
-          createdAt: new Date(todo.createdAt)
-        }))
-        setTodos(parsedTodos)
-      } catch (error) {
-        console.error('Error loading todos:', error)
-      }
-    }
+    loadTodos()
   }, [])
 
-  // Save todos to localStorage whenever todos change
-  useEffect(() => {
-    localStorage.setItem('dashboardTodos', JSON.stringify(todos))
-  }, [todos])
+  const loadTodos = async () => {
+    try {
+      const response = await fetch('/api/todos')
+      if (response.ok) {
+        const data = await response.json()
+        setTodos(data.todos || [])
+      } else {
+        console.error('Failed to load todos - using empty array')
+        setTodos([])
+      }
+    } catch (error) {
+      console.error('Error loading todos:', error)
+      setTodos([])
+    }
+  }
 
-  const addTodo = () => {
+  const addTodo = async () => {
     if (newTodoText.trim() === "") return
     
-    const newTodo: Todo = {
-      id: Date.now().toString(),
-      text: newTodoText.trim(),
-      completed: false,
-      assignedTo: selectedPerson,
-      createdAt: new Date()
+    try {
+      const response = await fetch('/api/todos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: newTodoText.trim(),
+          assigned_to: selectedPerson,
+        }),
+      })
+      
+      if (response.ok) {
+        await loadTodos() // Reload todos from database
+        setNewTodoText("")
+      } else {
+        const error = await response.json()
+        console.error('Failed to add todo:', error)
+        alert('Failed to add todo. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error adding todo:', error)
+      alert('Failed to add todo. Please try again.')
     }
+  }
+
+  const toggleTodo = async (id: string) => {
+    const todo = todos.find(t => t.id === id)
+    if (!todo) return
     
-    setTodos(prev => [newTodo, ...prev])
-    setNewTodoText("")
+    try {
+      const response = await fetch('/api/todos', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id,
+          completed: !todo.completed,
+        }),
+      })
+      
+      if (response.ok) {
+        await loadTodos() // Reload todos from database
+      } else {
+        const error = await response.json()
+        console.error('Failed to update todo:', error)
+        alert('Failed to update todo. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error updating todo:', error)
+      alert('Failed to update todo. Please try again.')
+    }
   }
 
-  const toggleTodo = (id: string) => {
-    setTodos(prev => prev.map(todo => 
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ))
-  }
-
-  const deleteTodo = (id: string) => {
-    setTodos(prev => prev.filter(todo => todo.id !== id))
+  const deleteTodo = async (id: string) => {
+    const confirmDelete = window.confirm("Are you sure you want to delete this todo?")
+    if (!confirmDelete) return
+    
+    try {
+      const response = await fetch(`/api/todos?id=${id}`, {
+        method: 'DELETE',
+      })
+      
+      if (response.ok) {
+        await loadTodos() // Reload todos from database
+      } else {
+        const error = await response.json()
+        console.error('Failed to delete todo:', error)
+        alert('Failed to delete todo. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error deleting todo:', error)
+      alert('Failed to delete todo. Please try again.')
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -74,10 +130,13 @@ export default function DashboardPage() {
 
   const refreshData = async () => {
     setRefreshing(true)
-    // Placeholder refresh function
-    setTimeout(() => {
+    try {
+      await loadTodos() // Refresh todos from database
+    } catch (error) {
+      console.error('Error refreshing todos:', error)
+    } finally {
       setRefreshing(false)
-    }, 1000)
+    }
   }
 
   return (
@@ -223,9 +282,8 @@ export default function DashboardPage() {
           {todos.length > 0 ? (
             <div className="space-y-0">
               {todos.map((todo, index) => (
-                <>
+                <React.Fragment key={todo.id}>
                   <div 
-                    key={todo.id} 
                     className="flex items-start justify-between px-0 min-h-[40px]" 
                     style={{ paddingTop: '10px', paddingBottom: '10px' }}
                   >
@@ -263,10 +321,10 @@ export default function DashboardPage() {
                       <div 
                         className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
                         style={{ 
-                          backgroundColor: todo.assignedTo === 'N' ? '#2c6fbb' : '#C11C84' 
+                          backgroundColor: todo.assigned_to === 'N' ? '#2c6fbb' : '#C11C84' 
                         }}
                       >
-                        {todo.assignedTo}
+                        {todo.assigned_to}
                       </div>
                     </div>
                     
@@ -282,7 +340,7 @@ export default function DashboardPage() {
                   {index < todos.length - 1 && (
                     <hr className="border-gray-200" />
                   )}
-                </>
+                </React.Fragment>
               ))}
             </div>
           ) : (
