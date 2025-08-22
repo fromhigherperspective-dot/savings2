@@ -28,6 +28,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Menu,
 } from "lucide-react"
 
 interface Transaction {
@@ -229,6 +230,9 @@ export default function BudgetApp() {
   const [currentView, setCurrentView] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   
+  // Menu dropdown state
+  const [showMenu, setShowMenu] = useState(false)
+  
   // Loading screen state
   const [showLoadingScreen, setShowLoadingScreen] = useState(false)
   const [loadingFadeOut, setLoadingFadeOut] = useState(false)
@@ -268,12 +272,24 @@ export default function BudgetApp() {
   // Check if we should show loading screen on server restart
   const shouldShowLoadingOnStart = () => {
     const lastServerStart = localStorage.getItem('lastServerStart')
-    const currentTime = Date.now().toString()
+    const lastNavigation = localStorage.getItem('lastNavigation')
+    const currentTime = Date.now()
     
-    if (!lastServerStart || lastServerStart !== currentTime) {
-      localStorage.setItem('lastServerStart', currentTime)
+    // Only show loading if more than 5 minutes have passed since last navigation
+    // This prevents loading screen when navigating between app pages
+    if (lastNavigation && currentTime - parseInt(lastNavigation) < 5 * 60 * 1000) {
+      localStorage.setItem('lastNavigation', currentTime.toString())
+      return false
+    }
+    
+    // Show loading if it's first time or more than 5 minutes since last visit
+    if (!lastServerStart || currentTime - parseInt(lastServerStart) > 5 * 60 * 1000) {
+      localStorage.setItem('lastServerStart', currentTime.toString())
+      localStorage.setItem('lastNavigation', currentTime.toString())
       return true
     }
+    
+    localStorage.setItem('lastNavigation', currentTime.toString())
     return false
   }
 
@@ -361,6 +377,23 @@ export default function BudgetApp() {
   useEffect(() => {
     setCurrentPage(1)
   }, [filterType, filterDate, filterUser])
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showMenu) {
+        const target = event.target as HTMLElement
+        if (!target.closest('.relative')) {
+          setShowMenu(false)
+        }
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showMenu])
 
   const loadTransactions = async () => {
     try {
@@ -732,7 +765,7 @@ export default function BudgetApp() {
         <div className="text-center">
           {/* App title - clean and static */}
           <div className="space-y-1 mb-4 text-center">
-            <h1 className="text-3xl font-light text-black tracking-wide text-center">Tinigom nato</h1>
+            <h1 className="text-3xl font-light text-black tracking-wide text-center">Tinigom Nato</h1>
             <p className="text-gray-500 text-sm font-light text-center">Loading your savings journey</p>
           </div>
           
@@ -847,7 +880,7 @@ export default function BudgetApp() {
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Tinigom nato</h1>
+            <h1 className="text-xl font-bold text-gray-900">Tinigom Nato</h1>
           </div>
           
           {/* Right side - User Toggle and Refresh Button */}
@@ -895,6 +928,36 @@ export default function BudgetApp() {
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </Button>
+            
+            {/* Menu Button */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMenu(!showMenu)}
+                className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 p-2 flex-shrink-0 min-w-[40px] h-[40px] border border-gray-200"
+                title="Menu"
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+              
+              {/* Dropdown Menu */}
+              {showMenu && (
+                <div className="absolute right-0 top-12 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[180px]">
+                  <div className="py-2">
+                    <button
+                      onClick={() => {
+                        setShowMenu(false)
+                        window.location.href = '/dashboard'
+                      }}
+                      className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                    >
+                      To do list
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1159,8 +1222,8 @@ export default function BudgetApp() {
             <>
               <div className="space-y-0">
                 {getPaginatedTransactions().transactions.map((transaction, index) => (
-                  <>
-                    <div key={transaction.id} className="flex items-center justify-between px-0" style={{ paddingTop: '10px', paddingBottom: '10px' }}>
+                  <React.Fragment key={transaction.id}>
+                    <div className="flex items-center justify-between px-0" style={{ paddingTop: '10px', paddingBottom: '10px' }}>
                       <div className="flex items-center space-x-3">
                         <div
                           className={`p-2 rounded-xl ${
@@ -1206,7 +1269,7 @@ export default function BudgetApp() {
                     {index < getPaginatedTransactions().transactions.length - 1 && (
                       <hr className="border-gray-200" />
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </div>
               
