@@ -21,29 +21,84 @@ export default function DashboardPage() {
   const [newTodoText, setNewTodoText] = useState("")
   const [selectedPerson, setSelectedPerson] = useState<"N" | "K">("N")
 
-  // Load todos from database on component mount
+  // Load todos with hybrid caching strategy
   useEffect(() => {
-    loadTodos()
+    loadTodosWithCache()
   }, [])
 
-  const loadTodos = async () => {
+  const loadTodosFromCache = () => {
+    try {
+      const cachedTodos = localStorage.getItem('dashboardTodos')
+      const cacheTimestamp = localStorage.getItem('todosCacheTimestamp')
+      
+      if (cachedTodos && cacheTimestamp) {
+        const parsed = JSON.parse(cachedTodos)
+        setTodos(parsed)
+        return { todos: parsed, timestamp: parseInt(cacheTimestamp) }
+      }
+    } catch (error) {
+      console.error('Error loading cached todos:', error)
+    }
+    return null
+  }
+
+  const saveTodosToCache = (todos: Todo[]) => {
+    try {
+      localStorage.setItem('dashboardTodos', JSON.stringify(todos))
+      localStorage.setItem('todosCacheTimestamp', Date.now().toString())
+    } catch (error) {
+      console.error('Error caching todos:', error)
+    }
+  }
+
+  const loadTodosWithCache = async () => {
+    // 1. Load from cache immediately for instant display
+    const cache = loadTodosFromCache()
+    
+    // 2. Check if cache is fresh (less than 30 seconds old)
+    const now = Date.now()
+    const isCacheFresh = cache && (now - cache.timestamp) < 30000 // 30 seconds
+    
+    // 3. If cache is stale or doesn't exist, fetch from database
+    if (!isCacheFresh) {
+      await loadTodosFromDatabase()
+    }
+  }
+
+  const loadTodosFromDatabase = async () => {
     try {
       const response = await fetch('/api/todos')
       if (response.ok) {
         const data = await response.json()
-        setTodos(data.todos || [])
+        const fetchedTodos = data.todos || []
+        setTodos(fetchedTodos)
+        saveTodosToCache(fetchedTodos)
       } else {
-        console.error('Failed to load todos - using empty array')
-        setTodos([])
+        console.error('Failed to load todos from database')
+        // Keep using cached data if database fails
       }
     } catch (error) {
-      console.error('Error loading todos:', error)
-      setTodos([])
+      console.error('Error loading todos from database:', error)
+      // Keep using cached data if database fails
     }
   }
 
   const addTodo = async () => {
     if (newTodoText.trim() === "") return
+    
+    // Optimistic update - add todo immediately to UI
+    const optimisticTodo: Todo = {
+      id: `temp-${Date.now()}`, // Temporary ID
+      text: newTodoText.trim(),
+      completed: false,
+      assigned_to: selectedPerson,
+      created_at: new Date().toISOString(),
+    }
+    
+    const newTodos = [optimisticTodo, ...todos]
+    setTodos(newTodos)
+    saveTodosToCache(newTodos)
+    setNewTodoText("")
     
     try {
       const response = await fetch('/api/todos', {
@@ -52,20 +107,30 @@ export default function DashboardPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          text: newTodoText.trim(),
+          text: optimisticTodo.text,
           assigned_to: selectedPerson,
         }),
       })
       
       if (response.ok) {
-        await loadTodos() // Reload todos from database
-        setNewTodoText("")
+        // Refresh from database to get real ID and sync any other changes
+        await loadTodosFromDatabase()
       } else {
+        // Revert optimistic update on failure
+        setTodos(todos)
+        saveTodosToCache(todos)
+        setNewTodoText(optimisticTodo.text) // Restore the text
+        
         const error = await response.json()
         console.error('Failed to add todo:', error)
         alert('Failed to add todo. Please try again.')
       }
     } catch (error) {
+      // Revert optimistic update on failure
+      setTodos(todos)
+      saveTodosToCache(todos)
+      setNewTodoText(optimisticTodo.text) // Restore the text
+      
       console.error('Error adding todo:', error)
       alert('Failed to add todo. Please try again.')
     }
@@ -74,6 +139,13 @@ export default function DashboardPage() {
   const toggleTodo = async (id: string) => {
     const todo = todos.find(t => t.id === id)
     if (!todo) return
+    
+    // Optimistic update - toggle immediately in UI
+    const updatedTodos = todos.map(t => 
+      t.id === id ? { ...t, completed: !t.completed } : t
+    )
+    setTodos(updatedTodos)
+    saveTodosToCache(updatedTodos)
     
     try {
       const response = await fetch('/api/todos', {
@@ -88,13 +160,22 @@ export default function DashboardPage() {
       })
       
       if (response.ok) {
-        await loadTodos() // Reload todos from database
+        // Sync with database to ensure consistency
+        await loadTodosFromDatabase()
       } else {
+        // Revert optimistic update on failure
+        setTodos(todos)
+        saveTodosToCache(todos)
+        
         const error = await response.json()
         console.error('Failed to update todo:', error)
         alert('Failed to update todo. Please try again.')
       }
     } catch (error) {
+      // Revert optimistic update on failure
+      setTodos(todos)
+      saveTodosToCache(todos)
+      
       console.error('Error updating todo:', error)
       alert('Failed to update todo. Please try again.')
     }
@@ -104,19 +185,40 @@ export default function DashboardPage() {
     const confirmDelete = window.confirm("Are you sure you want to delete this todo?")
     if (!confirmDelete) return
     
+    // Store the todo for potential restoration
+    const todoToDelete = todos.find(t => t.id === id)
+    
+    // Optimistic update - remove immediately from UI
+    const updatedTodos = todos.filter(t => t.id !== id)
+    setTodos(updatedTodos)
+    saveTodosToCache(updatedTodos)
+    
     try {
       const response = await fetch(`/api/todos?id=${id}`, {
         method: 'DELETE',
       })
       
       if (response.ok) {
-        await loadTodos() // Reload todos from database
+        // Sync with database to ensure consistency
+        await loadTodosFromDatabase()
       } else {
+        // Revert optimistic update on failure
+        if (todoToDelete) {
+          setTodos(todos)
+          saveTodosToCache(todos)
+        }
+        
         const error = await response.json()
         console.error('Failed to delete todo:', error)
         alert('Failed to delete todo. Please try again.')
       }
     } catch (error) {
+      // Revert optimistic update on failure
+      if (todoToDelete) {
+        setTodos(todos)
+        saveTodosToCache(todos)
+      }
+      
       console.error('Error deleting todo:', error)
       alert('Failed to delete todo. Please try again.')
     }
@@ -131,7 +233,7 @@ export default function DashboardPage() {
   const refreshData = async () => {
     setRefreshing(true)
     try {
-      await loadTodos() // Refresh todos from database
+      await loadTodosFromDatabase() // Refresh todos from database and update cache
     } catch (error) {
       console.error('Error refreshing todos:', error)
     } finally {

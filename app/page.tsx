@@ -948,7 +948,7 @@ export default function BudgetApp() {
                     <button
                       onClick={() => {
                         setShowMenu(false)
-                        window.location.href = '/dashboard'
+                        window.location.href = '/to-do-list'
                       }}
                       className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
                     >
