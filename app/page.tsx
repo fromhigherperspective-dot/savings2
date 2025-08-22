@@ -221,11 +221,12 @@ export default function BudgetApp() {
 
 
 
-  // Motivational quote state
-  const [motivationalQuote, setMotivationalQuote] = useState("Wealth begins where impulse ends.")
+  // Motivational quotes state
+  const [nuoneQuote, setNuoneQuote] = useState("Nuone, wealth begins where impulse ends.")
+  const [kateQuote, setKateQuote] = useState("Kate bestie, mindful spending is self-care!")
   
-  // Success likelihood and animation state
-  const [showSuccessLikelihood, setShowSuccessLikelihood] = useState(false)
+  // 3-way animation state: 0 = Nuone quote, 1 = Success %, 2 = Kate quote
+  const [currentView, setCurrentView] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   
   // Loading screen state
@@ -299,7 +300,7 @@ export default function BudgetApp() {
         setAppReady(true)
         loadTransactions()
         loadSettings()
-        loadMotivationalQuote()
+        loadMotivationalQuotes()
       }, 1000) // Load data early
       
       // Show loading for 2.5 seconds then start fade out
@@ -320,7 +321,7 @@ export default function BudgetApp() {
       setAppReady(true)
       loadTransactions()
       loadSettings()
-      loadMotivationalQuote()
+      loadMotivationalQuotes()
       
       // Start activity tracking immediately
       updateActivity()
@@ -332,17 +333,17 @@ export default function BudgetApp() {
       document.addEventListener(event, updateActivity, true)
     })
     
-    // Set up interval to check for new quotes every 12 hours
-    const quoteInterval = setInterval(loadMotivationalQuote, 12 * 60 * 60 * 1000) // 12 hours
+    // Set up automatic quote generation every 4 hours
+    const quoteInterval = setInterval(loadMotivationalQuotes, 4 * 60 * 60 * 1000) // 4 hours
     
-    // Set up smooth fade animation between quote and success likelihood every 5 seconds
+    // Set up 3-way fade animation: Nuone quote → Success % → Kate quote → repeat
     const fadeInterval = setInterval(() => {
       setIsTransitioning(true)
       
       setTimeout(() => {
-        setShowSuccessLikelihood(prev => !prev)
+        setCurrentView(prev => (prev + 1) % 3) // Cycle through 0, 1, 2
         setIsTransitioning(false)
-      }, 518) // 518ms fade out duration (20% more slower)
+      }, 518) // 518ms fade out duration
       
     }, 7000) // 7 seconds
     
@@ -399,19 +400,25 @@ export default function BudgetApp() {
     }
   }
 
-  const loadMotivationalQuote = async () => {
+  const loadMotivationalQuotes = async () => {
     try {
-      const response = await fetch('/api/motivational-quote')
+      // Add timestamp to force fresh quotes and prevent caching
+      const timestamp = Date.now()
+      const response = await fetch(`/api/motivational-quote?t=${timestamp}`)
       if (response.ok) {
         const data = await response.json()
-        setMotivationalQuote(data.quote || "Wealth begins where impulse ends.")
+        setNuoneQuote(data.nuoneQuote || "Nuone, wealth begins where impulse ends.")
+        setKateQuote(data.kateQuote || "Kate bestie, mindful spending is self-care!")
+        console.log('New quotes loaded:', { nuone: data.nuoneQuote, kate: data.kateQuote })
       } else {
-        console.error('Failed to load motivational quote - using default')
-        setMotivationalQuote("Wealth begins where impulse ends.")
+        console.error('Failed to load motivational quotes - using defaults')
+        setNuoneQuote("Nuone, wealth begins where impulse ends.")
+        setKateQuote("Kate bestie, mindful spending is self-care!")
       }
     } catch (error) {
-      console.error('Error loading motivational quote:', error)
-      setMotivationalQuote("Wealth begins where impulse ends.")
+      console.error('Error loading motivational quotes:', error)
+      setNuoneQuote("Nuone, wealth begins where impulse ends.")
+      setKateQuote("Kate bestie, mindful spending is self-care!")
     }
   }
 
@@ -419,7 +426,8 @@ export default function BudgetApp() {
   const refreshData = async () => {
     setRefreshing(true)
     try {
-      await Promise.all([loadTransactions(), loadSettings(), loadMotivationalQuote()])
+      // Always load new motivational quotes on refresh
+      await Promise.all([loadTransactions(), loadSettings(), loadMotivationalQuotes()])
     } catch (error) {
       console.error('Error refreshing data:', error)
     } finally {
@@ -969,19 +977,23 @@ export default function BudgetApp() {
             </div>
           )}
           
-          {/* Motivational Quote and Success Likelihood under pie chart */}
+          {/* 3-Way Cycling: Nuone Quote → Success % → Kate Quote */}
           <div className="text-center mt-4 pt-4 border-t border-gray-100 relative h-12 flex items-center justify-center">
             <div 
               className={`absolute inset-0 flex items-center justify-center transition-opacity duration-[518ms] ease-in-out ${
                 isTransitioning ? 'opacity-0' : 'opacity-100'
               }`}
             >
-              {!showSuccessLikelihood ? (
-                <p className="text-gray-700 text-sm font-medium italic">"{motivationalQuote}"</p>
-              ) : (
+              {currentView === 0 && (
+                <p className="text-gray-700 text-sm font-medium italic">"{nuoneQuote}"</p>
+              )}
+              {currentView === 1 && (
                 <p className="text-gray-700 text-sm font-medium italic">
                   {targetMonths > 0 ? `${successLikelihood}% chance of reaching goal by target date` : 'Set a target timeline to see success likelihood'}
                 </p>
+              )}
+              {currentView === 2 && (
+                <p className="text-gray-700 text-sm font-medium italic">"{kateQuote}"</p>
               )}
             </div>
           </div>
@@ -1145,9 +1157,10 @@ export default function BudgetApp() {
           
           {transactions.length > 0 ? (
             <>
-              <div className="space-y-3">
-                {getPaginatedTransactions().transactions.map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-100 rounded-xl border border-gray-200">
+              <div className="space-y-0">
+                {getPaginatedTransactions().transactions.map((transaction, index) => (
+                  <>
+                    <div key={transaction.id} className="flex items-center justify-between px-0" style={{ paddingTop: '10px', paddingBottom: '10px' }}>
                       <div className="flex items-center space-x-3">
                         <div
                           className={`p-2 rounded-xl ${
@@ -1190,7 +1203,11 @@ export default function BudgetApp() {
                         </Button>
                       </div>
                     </div>
-                  ))}
+                    {index < getPaginatedTransactions().transactions.length - 1 && (
+                      <hr className="border-gray-200" />
+                    )}
+                  </>
+                ))}
               </div>
               
               {/* Pagination Controls */}
