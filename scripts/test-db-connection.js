@@ -4,6 +4,24 @@
  * Usage: node scripts/test-db-connection.js
  */
 
+// Load environment variables from .env.local
+const fs = require('fs')
+const path = require('path')
+
+try {
+  const envPath = path.join(__dirname, '..', '.env.local')
+  const envContent = fs.readFileSync(envPath, 'utf8')
+  
+  envContent.split('\n').forEach(line => {
+    const [key, value] = line.split('=', 2)
+    if (key && value && !key.startsWith('#')) {
+      process.env[key.trim()] = value.trim()
+    }
+  })
+} catch (err) {
+  console.log('Could not load .env.local file')
+}
+
 const { createClient } = require('@supabase/supabase-js')
 
 // Colors for console output

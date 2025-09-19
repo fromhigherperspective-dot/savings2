@@ -17,7 +17,10 @@
       "Bash(curl:*)",
       "Bash(pkill:*)",
       "Bash(true)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(node:*)",
+      "Bash(ping:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": []
   }

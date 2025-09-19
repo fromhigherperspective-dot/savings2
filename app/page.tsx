@@ -954,6 +954,15 @@ export default function BudgetApp() {
                     >
                       To do list
                     </button>
+                    <button
+                      onClick={() => {
+                        setShowMenu(false)
+                        window.location.href = '/invoice'
+                      }}
+                      className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                    >
+                      Create Invoice
+                    </button>
                   </div>
                 </div>
               )}
